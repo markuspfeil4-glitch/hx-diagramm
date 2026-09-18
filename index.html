@@ -77,7 +77,16 @@
             const [showGrid, setShowGrid] = useState(true);
 
             // Physik Modelle
-            const getSatPressure = (T) => 6.112 * Math.exp((17.67 * T) / (T + 243.5));
+            // Magnus-Formel (Bolton 1980): ein Konstanten-Satz für Sättigungsdruck UND Taupunkt,
+            // damit der Taupunkt exakt auf der φ = 100 %-Kurve liegt
+            const MAGNUS = { p0: 6.112, a: 17.67, b: 243.5 }; // hPa, -, °C
+            const getSatPressure = (T) => MAGNUS.p0 * Math.exp((MAGNUS.a * T) / (T + MAGNUS.b));
+            // Umkehrfunktion: Temperatur, bei der p_sat = p_vap
+            const getDewPoint = (T, rh) => {
+                const p_vap = getSatPressure(T) * (Math.max(rh, 1) / 100.0);
+                const ln = Math.log(p_vap / MAGNUS.p0);
+                return (MAGNUS.b * ln) / (MAGNUS.a - ln);
+            };
             const calculateMixingRatio = (T, rh) => {
                 const p_sat = getSatPressure(T);
                 const p_vap = p_sat * (rh / 100.0);
@@ -116,9 +125,7 @@
 
             useEffect(() => {
                 // Taupunkt
-                const a = 17.27, b = 237.7;
-                const alpha = ((a * temperature) / (b + temperature)) + Math.log(Math.max(humidity, 1) / 100.0);
-                const dp = (b * alpha) / (a - alpha);
+                const dp = getDewPoint(temperature, humidity);
                 setDewPoint(parseFloat(dp.toFixed(2)));
 
                 // Feuchtkugel
