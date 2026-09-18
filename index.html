@@ -79,6 +79,7 @@
             const [showWetBulbPath, setShowWetBulbPath] = useState(true);
             const [showGrid, setShowGrid] = useState(true);
             const [showEnthalpy, setShowEnthalpy] = useState(true);
+            const [showScale, setShowScale] = useState(false);
 
             // Physik Modelle
             // Magnus-Formel: über Wasser (Bolton 1980) für t ≥ 0 °C, über Eis (Sonntag 1990) für t < 0 °C.
@@ -248,6 +249,22 @@
                 return lines;
             }, []);
 
+            // Randmaßstab Δh/Δx: Richtung q (kJ/kg Wasser) bedeutet Δv = Δx·(q/1000 − r0) je g/kg.
+            // Strahlen gehen vom Pol (t = 0 °C, x = 0) aus; Skalenmarken dort, wo sie den Rahmen verlassen.
+            const SCALE_Q = [-1000, 0, 1000, 2000, 2500, 3000, 4000, 6000, 10000, Infinity];
+            const rayExit = (q) => {
+                if (!isFinite(q)) return { x: 0, v: vMax, edge: "top" };
+                const slope = q / 1000 - R0;
+                const x = config.maxX, v = slope * x;
+                if (v > vMax) return { x: vMax / slope, v: vMax, edge: "top" };
+                if (v < vMin) return { x: vMin / slope, v: vMin, edge: "bottom" };
+                return { x, v, edge: "right" };
+            };
+            const scaleTicks = useMemo(() => SCALE_Q.map(q => {
+                const e = rayExit(q);
+                return { q, edge: e.edge, px: scaleX(e.x), py: scaleV(e.v) };
+            }), []);
+
             const enthalpy = getEnthalpy(temperature, calculateMixingRatio(temperature, humidity));
             const currX = scaleX(mixingRatio);
             const currY = scaleY(temperature, mixingRatio);
@@ -382,6 +399,19 @@
                             <div className={`p-2 rounded border cursor-pointer flex items-center gap-2 text-sm ${showEnthalpy ? 'bg-amber-50 border-amber-400' : 'bg-white'}`} onClick={() => setShowEnthalpy(!showEnthalpy)}>
                                 <span className="w-4 h-4 block text-amber-600"><Icons.ArrowUpRight/></span> Isenthalpen (h = const, 5 kJ/kg)
                             </div>
+
+                            <div className={`p-3 rounded border transition-all ${showScale ? 'bg-emerald-50 border-emerald-400' : 'bg-white border-slate-200'}`}>
+                                <div className="cursor-pointer flex items-center gap-2" onClick={() => setShowScale(!showScale)}>
+                                    <span className={showScale ? "text-emerald-600" : "text-slate-400"}><Icons.ArrowUpRight/></span>
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-sm">Randmaßstab Δh/Δx</span>
+                                        <span className="text-xs text-slate-500">Richtung von Zustandsänderungen</span>
+                                    </div>
+                                </div>
+                                {showScale && (
+                                    <div className="mt-2 text-xs text-slate-500">Richtung ablesen: Strahl vom Pol zum Skalenwert, parallel durch den Zustandspunkt verschieben.</div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -435,7 +465,7 @@
                                                 transform={`rotate(${l.label.angle} ${l.label.x} ${l.label.y})`}
                                                 fontSize="10" fontWeight="bold" fill="#b45309">{l.h}</text>
                                         ))}
-                                        <text x={plot.right} y={plot.top - 12} textAnchor="end" fontSize="12" fontWeight="bold" fill="#b45309">Enthalpie h (kJ/kg) ↘</text>
+                                        <text x={plot.left + 8} y={plot.top - 22} fontSize="12" fontWeight="bold" fill="#b45309">Enthalpie h (kJ/kg) ↘</text>
                                     </g>
                                 )}
 
@@ -468,6 +498,36 @@
                                 })}
                                 <text x={scaleX(28)} y={scaleY(30, 28)} fontSize="12" fontWeight="bold" fill="black">φ = 100%</text>
                                 <text x={scaleX(27)} y={scaleY(6, 27)} fontSize="12" fontStyle="italic" fill="#94a3b8">Nebelgebiet</text>
+
+                                {/* RANDMASSSTAB Δh/Δx */}
+                                {showScale && (
+                                    <g fill="#047857" fontSize="9" fontWeight="bold">
+                                        {scaleTicks.map(tk => {
+                                            const label = isFinite(tk.q) ? fmt(tk.q, 0) : "±∞";
+                                            if (tk.edge === "top") return (
+                                                <g key={`q${tk.q}`}>
+                                                    <line x1={tk.px} y1={plot.top} x2={tk.px} y2={plot.top + 6} stroke="#047857" strokeWidth="1.5" />
+                                                    <text x={tk.px} y={plot.top - 5} textAnchor={isFinite(tk.q) ? "middle" : "start"}>{label}</text>
+                                                </g>
+                                            );
+                                            if (tk.edge === "right") return (
+                                                <g key={`q${tk.q}`}>
+                                                    <line x1={plot.right - 6} y1={tk.py} x2={plot.right} y2={tk.py} stroke="#047857" strokeWidth="1.5" />
+                                                    <text x={plot.right + 4} y={tk.py + 3}>{label}</text>
+                                                </g>
+                                            );
+                                            return (
+                                                <g key={`q${tk.q}`}>
+                                                    <line x1={tk.px} y1={plot.bottom - 6} x2={tk.px} y2={plot.bottom} stroke="#047857" strokeWidth="1.5" />
+                                                    <text x={tk.px} y={plot.bottom - 10} textAnchor="middle">{label}</text>
+                                                </g>
+                                            );
+                                        })}
+                                        <circle cx={scaleX(0)} cy={scaleV(0)} r="4" fill="#047857" />
+                                        <text x={scaleX(0) + 6} y={scaleV(0) - 6}>Pol</text>
+                                        <text x={plot.right} y={plot.top - 22} textAnchor="end" fontSize="12">Randmaßstab Δh/Δx (kJ/kg)</text>
+                                    </g>
+                                )}
 
                                 {/* Pfade */}
                                 {showDewPath && (
