@@ -5,7 +5,19 @@
 
 # Projektdokumente gehören ins Repository, nicht auf die Webseite
 [[redirects]]
-  from = "/*.md"
+  from = "/README.md"
+  to = "/404"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/PRODUCT.md"
+  to = "/404"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/DESIGN.md"
   to = "/404"
   status = 404
   force = true
