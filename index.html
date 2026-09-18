@@ -81,15 +81,21 @@
             const [showEnthalpy, setShowEnthalpy] = useState(true);
 
             // Physik Modelle
-            // Magnus-Formel (Bolton 1980): ein Konstanten-Satz für Sättigungsdruck UND Taupunkt,
-            // damit der Taupunkt exakt auf der φ = 100 %-Kurve liegt
-            const MAGNUS = { p0: 6.112, a: 17.67, b: 243.5 }; // hPa, -, °C
-            const getSatPressure = (T) => MAGNUS.p0 * Math.exp((MAGNUS.a * T) / (T + MAGNUS.b));
-            // Umkehrfunktion: Temperatur, bei der p_sat = p_vap
+            // Magnus-Formel: über Wasser (Bolton 1980) für t ≥ 0 °C, über Eis (Sonntag 1990) für t < 0 °C.
+            // Sättigungsdruck UND Taupunkt nutzen dieselben Konstanten, damit der Taupunkt
+            // exakt auf der φ = 100 %-Kurve liegt. Beide Sätze treffen sich bei 0 °C in p0.
+            const MAGNUS_WATER = { p0: 6.112, a: 17.67, b: 243.5 }; // hPa, -, °C
+            const MAGNUS_ICE = { p0: 6.112, a: 22.46, b: 272.62 };
+            const getSatPressure = (T) => {
+                const m = T < 0 ? MAGNUS_ICE : MAGNUS_WATER;
+                return m.p0 * Math.exp((m.a * T) / (T + m.b));
+            };
+            // Umkehrfunktion: Temperatur, bei der p_sat = p_vap (unter 0 °C: Reifpunkt über Eis)
             const getDewPoint = (T, rh) => {
                 const p_vap = getSatPressure(T) * (Math.max(rh, 1) / 100.0);
-                const ln = Math.log(p_vap / MAGNUS.p0);
-                return (MAGNUS.b * ln) / (MAGNUS.a - ln);
+                const m = p_vap < MAGNUS_WATER.p0 ? MAGNUS_ICE : MAGNUS_WATER;
+                const ln = Math.log(p_vap / m.p0);
+                return (m.b * ln) / (m.a - ln);
             };
             const calculateMixingRatio = (T, rh) => {
                 const p_sat = getSatPressure(T);
@@ -157,9 +163,9 @@
 
             // Diagramm Config
             const config = {
-                minT: -5, maxT: 45,
+                minT: -20, maxT: 45,
                 minX: 0, maxX: 35,
-                width: 800, height: 600,
+                width: 800, height: 700,
                 pad: { t: 40, r: 40, b: 50, l: 50 }
             };
 
@@ -194,15 +200,21 @@
                 return lines;
             }, []);
 
-            // Isothermen: bis zur Sättigungskurve, danach Nebelisotherme (flüssiges Wasser, c_w = 4,19 kJ/kgK)
+            // Isothermen: bis zur Sättigungskurve, danach Nebelisothermen mit der Enthalpie des Kondensats
+            // (kJ/kg): Wasser h_w = 4,19·t, Eis h_e = 2,05·t − 333,4. Bei 0 °C beide → Nebelkeil.
+            const FOG_PHASES = { water: (t) => 4.19 * t, ice: (t) => 2.05 * t - 333.4 };
             const isotherms = useMemo(() => {
                 return generateRange(config.minT, config.maxT, 1).map(t => {
                     const xs = Math.min(calculateMixingRatio(t, 100), config.maxX);
-                    const fogEndV = getEnthalpy(t, xs) + (config.maxX - xs) / 1000 * 4.19 * t - R0 * config.maxX;
+                    const phases = t > 0 ? ["water"] : t < 0 ? ["ice"] : ["water", "ice"];
+                    const fogs = xs < config.maxX ? phases.map(phase => {
+                        const fogEndV = getEnthalpy(t, xs) + (config.maxX - xs) / 1000 * FOG_PHASES[phase](t) - R0 * config.maxX;
+                        return { phase, d: `M ${scaleX(xs)},${scaleY(t, xs)} L ${scaleX(config.maxX)},${scaleV(fogEndV)}` };
+                    }) : [];
                     return {
                         t, isMajor: t % 5 === 0,
                         dry: `M ${scaleX(0)},${scaleY(t, 0)} L ${scaleX(xs)},${scaleY(t, xs)}`,
-                        fog: xs < config.maxX ? `M ${scaleX(xs)},${scaleY(t, xs)} L ${scaleX(config.maxX)},${scaleV(fogEndV)}` : null
+                        fogs
                     };
                 });
             }, []);
@@ -295,7 +307,7 @@
                                 </div>
                                 <input 
                                     type="range" 
-                                    min="-5" max="45" step="0.5" 
+                                    min="-20" max="45" step="0.5" 
                                     value={temperature} 
                                     onChange={e => handleTempChange(e.target.value)} 
                                     className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-red-500"
@@ -345,7 +357,7 @@
                                 <div className="flex items-center gap-2">
                                     <span className={showDewPath ? "text-cyan-600" : "text-slate-400"}><Icons.ArrowDown/></span>
                                     <div className="flex flex-col">
-                                        <span className="font-bold text-sm">Taupunkt</span>
+                                        <span className="font-bold text-sm">{dewPoint < 0 ? "Reifpunkt" : "Taupunkt"}</span>
                                         <span className="text-xs text-slate-500">Vertikal (x=const)</span>
                                     </div>
                                 </div>
@@ -401,7 +413,9 @@
                                         {isotherms.map(iso => (
                                             <g key={`iso${iso.t}`}>
                                                 <path d={iso.dry} fill="none" stroke={iso.isMajor ? "#cbd5e1" : "#f1f5f9"} strokeWidth={iso.isMajor ? "1.5" : "1"} />
-                                                {iso.isMajor && iso.fog && <path d={iso.fog} fill="none" stroke="#cbd5e1" strokeWidth="1" strokeDasharray="3,3" />}
+                                                {iso.isMajor && iso.fogs.map(f => (
+                                                    <path key={f.phase} d={f.d} fill="none" stroke={f.phase === "ice" ? "#93c5fd" : "#cbd5e1"} strokeWidth="1" strokeDasharray="3,3" />
+                                                ))}
                                             </g>
                                         ))}
                                     </g>
