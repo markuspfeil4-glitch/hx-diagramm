@@ -11,4 +11,6 @@ Interaktives h,x-Diagramm (Mollier) für die Lüftungs-Vorlesung.
 
 ## Starten
 
-`index.html` im Browser öffnen – keine Installation nötig.
+Online: https://hx-trainer.netlify.app (Netlify, automatisch aus `main`; jeder Pull Request bekommt einen eigenen Vorschau-Link).
+
+Lokal: `index.html` im Browser öffnen – keine Installation nötig.

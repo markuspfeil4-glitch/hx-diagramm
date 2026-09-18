@@ -1,0 +1,29 @@
+# Netlify: statische Seite ohne Build, veröffentlicht wird das Repository-Verzeichnis
+[build]
+  publish = "."
+  command = ""
+
+# Projektdokumente gehören ins Repository, nicht auf die Webseite
+[[redirects]]
+  from = "/README.md"
+  to = "/404"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/PRODUCT.md"
+  to = "/404"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/DESIGN.md"
+  to = "/404"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/netlify.toml"
+  to = "/404"
+  status = 404
+  force = true
