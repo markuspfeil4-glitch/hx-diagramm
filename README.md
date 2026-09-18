@@ -7,7 +7,7 @@ Interaktives h,x-Diagramm (Mollier) für die Lüftungs-Vorlesung.
 - Klimazonen-Presets (Köln, Kopenhagen, Sevilla, Tunis, San Diego, Singapur)
 - Taupunkt bzw. Reifpunkt (x = const) und Feuchtkugeltemperatur (h = const) grafisch ablesen
 - Sättigung über Eis unter 0 °C, Diagrammbereich −20 … 45 °C
-- Randmaßstab Δh/Δx mit Richtungsgerade für Wasser- und Dampfbefeuchtung
+- Randmaßstab Δh/Δx (Richtungsmaßstab) mit Pol bei 0 °C
 
 ## Starten
 
