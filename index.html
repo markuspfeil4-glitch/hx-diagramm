@@ -31,7 +31,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useRef } = React;
 
         // --- ICONS ---
         const Icons = {
@@ -265,6 +265,34 @@
                 return { q, edge: e.edge, px: scaleX(e.x), py: scaleV(e.v) };
             }), []);
 
+            // Klick/Ziehen im Diagramm: Bildschirm → SVG → (x, v) → (t, φ)
+            const svgRef = useRef(null);
+            const draggingRef = useRef(false);
+            const setStateFromPointer = (e) => {
+                const svg = svgRef.current;
+                if (!svg) return;
+                const pt = svg.createSVGPoint();
+                pt.x = e.clientX; pt.y = e.clientY;
+                const p = pt.matrixTransform(svg.getScreenCTM().inverse());
+                if (p.x < plot.left || p.x > plot.right || p.y < plot.top || p.y > plot.bottom) return;
+                const x = (p.x - plot.left) / (plot.right - plot.left) * config.maxX;
+                const v = vMin + (plot.bottom - p.y) / (plot.bottom - plot.top) * (vMax - vMin);
+                const t = v / (1.006 + 0.00186 * x);
+                if (t < config.minT || t > config.maxT) return;
+                const p_vap = x * 1013.25 / (622 + x);
+                const rh = Math.min(100, p_vap / getSatPressure(t) * 100); // Nebelgebiet → φ = 100 %
+                setTemperature(Math.round(t * 10) / 10);
+                setHumidity(Math.round(rh * 10) / 10);
+                setSelectedLocation("custom");
+            };
+            const handlePointerDown = (e) => {
+                draggingRef.current = true;
+                e.currentTarget.setPointerCapture(e.pointerId);
+                setStateFromPointer(e);
+            };
+            const handlePointerMove = (e) => { if (draggingRef.current) setStateFromPointer(e); };
+            const handlePointerUp = () => { draggingRef.current = false; };
+
             const enthalpy = getEnthalpy(temperature, calculateMixingRatio(temperature, humidity));
             const currX = scaleX(mixingRatio);
             const currY = scaleY(temperature, mixingRatio);
@@ -418,7 +446,15 @@
                     {/* RECHTES PANEL: SVG */}
                     <div className="lg:w-2/3 bg-white p-4 relative overflow-auto">
                         <div className="w-full h-full min-h-[600px] flex flex-col">
-                            <svg viewBox={`0 0 ${config.width} ${config.height}`} className="w-full h-full select-none font-sans">
+                            <svg
+                                ref={svgRef}
+                                viewBox={`0 0 ${config.width} ${config.height}`}
+                                className="w-full h-full select-none font-sans cursor-crosshair touch-none"
+                                onPointerDown={handlePointerDown}
+                                onPointerMove={handlePointerMove}
+                                onPointerUp={handlePointerUp}
+                                onPointerCancel={handlePointerUp}
+                            >
                                 <defs>
                                     <clipPath id="plotArea">
                                         <rect x={plot.left} y={plot.top} width={plot.right - plot.left} height={plot.bottom - plot.top} />
