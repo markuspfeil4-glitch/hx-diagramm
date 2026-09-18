@@ -2,7 +2,8 @@
 
 Interaktives h,x-Diagramm (Mollier) für die Lüftungs-Vorlesung.
 
-- Zustandspunkt über Temperatur und relative Feuchte einstellen
+- Schiefwinkliges Mollier-Koordinatensystem mit Isenthalpen (h = const), Isothermen und Nebelisothermen
+- Zustandspunkt über Temperatur und relative Feuchte einstellen, Anzeige von x und h
 - Klimazonen-Presets (Köln, Kopenhagen, Sevilla, Tunis, San Diego, Singapur)
 - Taupunkt (x = const) und Feuchtkugeltemperatur (h = const) grafisch ablesen
 
