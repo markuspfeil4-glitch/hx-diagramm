@@ -93,6 +93,19 @@
                 const p_atm = 1013.25;
                 return 622 * p_vap / (p_atm - p_vap);
             };
+            // Spez. Enthalpie feuchter Luft in kJ/kg tr. Luft (x in g/kg)
+            const getEnthalpy = (T, x) => 1.006 * T + (x / 1000) * (2501 + 1.86 * T);
+            // Feuchtkugel-/Kühlgrenztemperatur: Schnitt von h = const mit φ = 100 %
+            // (Bisektion, h_sat(t) steigt streng monoton)
+            const getWetBulb = (T, rh) => {
+                const h = getEnthalpy(T, calculateMixingRatio(T, rh));
+                let lo = -60, hi = T;
+                for (let i = 0; i < 60; i++) {
+                    const mid = (lo + hi) / 2;
+                    if (getEnthalpy(mid, calculateMixingRatio(mid, 100)) < h) lo = mid; else hi = mid;
+                }
+                return (lo + hi) / 2;
+            };
 
             // Handler für Eingaben
             const handleTempChange = (val) => {
@@ -129,10 +142,7 @@
                 setDewPoint(parseFloat(dp.toFixed(2)));
 
                 // Feuchtkugel
-                const T = temperature, rh = humidity;
-                const wb = T * Math.atan(0.151977 * Math.pow(rh + 8.313659, 0.5)) +
-                        Math.atan(T + rh) - Math.atan(rh - 1.676331) +
-                        0.00391838 * Math.pow(rh, 1.5) * Math.atan(0.028644 * rh) - 4.686035;
+                const wb = getWetBulb(temperature, humidity);
                 setWetBulb(parseFloat(wb.toFixed(2)));
 
                 // Wassergehalt
